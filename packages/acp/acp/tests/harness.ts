@@ -27,6 +27,7 @@ class MockAdapter extends LlmAdapter {
   constructor(
     private readonly script: (StreamChunk[] | 'hang')[],
     private readonly imageCapable: boolean,
+    private readonly emptyCatalog: boolean,
   ) {
     super()
   }
@@ -37,12 +38,22 @@ class MockAdapter extends LlmAdapter {
   }
 
   override listModels(provider: string) {
-    return Promise.resolve(provider === 'mock' ? [{
-      provider: 'mock',
-      id: 'mock',
-      name: 'Mock',
-      inputModalities: this.imageCapable ? ['text', 'image'] as const : ['text'] as const,
-    }] : [])
+    if (this.emptyCatalog) return Promise.resolve([])
+    return Promise.resolve(provider === 'mock' ? [
+      {
+        provider: 'mock',
+        id: 'mock',
+        name: 'Mock',
+        description: 'Default mock model.',
+        inputModalities: this.imageCapable ? ['text', 'image'] as const : ['text'] as const,
+      },
+      {
+        provider: 'mock',
+        id: 'mock-alt',
+        name: 'Mock Alt',
+        inputModalities: this.imageCapable ? ['text', 'image'] as const : ['text'] as const,
+      },
+    ] : [])
   }
 
   override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
@@ -179,8 +190,9 @@ export async function makeBridgeHarness(options: {
   persona?: string
   imageCapable?: boolean
   attachments?: boolean
+  emptyCatalog?: boolean
 } = {}): Promise<BridgeHarness> {
-  const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true)
+  const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true, options.emptyCatalog === true)
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { persona: options.persona ?? '' } })
   if (options.attachments !== false) await ctx.plugin(MemoryAttachmentStore)
@@ -235,7 +247,7 @@ export async function makeBridgeHarness(options: {
   harness.acpFiber = await ctx.plugin({
     name: 'acp-test',
     inject: [...AcpPlugin.inject],
-    apply: (inner: Context) => { AcpPlugin.apply(inner, config) },
+    apply: (inner: Context) => AcpPlugin.apply(inner, config),
   })
   harness.client = new ClientSideConnection(makeClient, clientStream)
   return harness

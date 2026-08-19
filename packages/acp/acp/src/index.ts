@@ -30,19 +30,22 @@ import {
   type PromptRequest,
   type PromptResponse,
   type SessionNotification,
+  type SetSessionConfigOptionRequest,
+  type SetSessionConfigOptionResponse,
   type StopReason,
   type Stream,
 } from '@agentclientprotocol/sdk'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { installModelSelection, type Agent, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionEvent, type TurnEndReason } from '@deepseek-ai/dsh-session'
 // Side-effect type import: declaration-merges the approval waterfall answered below.
 import type {} from '@deepseek-ai/dsh-user-approval'
 import { AcpContentError, admitAcpPrompt, assistantBlockToAcp, supportsAcpImagePrompts } from './content.ts'
 import { turnEndToStopReason } from './codec.ts'
+import { loadAcpModelCatalog, MODEL_CONFIG_ID, modelConfigOptions, type AcpModelCatalog } from './model-config.ts'
 
 export const name = 'acp'
 /** The bridge creates and owns agents; every other concern is carried by the agent composition. */
-export const inject = ['agents']
+export const inject = ['agents', 'llm']
 
 /**
  * The single continuable-subagent teardown the bridge needs. Declared
@@ -73,6 +76,8 @@ export interface AcpConfig {
   provider?: string
   /** Model name for created agents. */
   model?: string
+  /** Expose the configured provider's model catalog as a session-local ACP selector. */
+  modelSelection?: boolean
   /** Runtime-only transport override; production uses stdio. */
   stream?: Stream
 }
@@ -80,11 +85,14 @@ export interface AcpConfig {
 export const Config: Schema<AcpConfig> = Schema.object({
   provider: Schema.string(),
   model: Schema.string(),
+  modelSelection: Schema.boolean().default(false),
 })
 
 /** Per-session protocol state. */
 interface SessionRecord {
   agent: Agent
+  /** Session-local selection installed in this Agent's scoped request path. */
+  modelSelection: ModelSelectionRef | undefined
   /** Exact owned-agent disposer; resolves after registry, loop, and session teardown. */
   dispose: () => Promise<void>
   /** Ordered assistant-output delivery; every task contains its own failure. */
@@ -118,11 +126,14 @@ interface SessionRecord {
  * @param ctx - Cordis context carrying the agent factory and session events.
  * @param config - Initial provider/model selection and optional test transport.
  */
-export function apply(ctx: Context, config: AcpConfig): void {
+export async function apply(ctx: Context, config: AcpConfig): Promise<void> {
   // ACP handlers execute outside this plugin's injection scope, so capture the
   // injected service during apply rather than reading it lazily in a callback.
   const agents = ctx.agents
   const logger = ctx.logger
+  const modelCatalog = config.modelSelection === true
+    ? await loadAcpModelCatalog(ctx, config.provider, config.model)
+    : undefined
   const sessions = new Map<SessionId, SessionRecord>()
   let closed = false
   let conn: AgentSideConnection
@@ -290,7 +301,11 @@ export function apply(ctx: Context, config: AcpConfig): void {
       async initialize(_params: InitializeRequest): Promise<InitializeResponse> {
         // Single-version agent: the spec's "same version if supported, else
         // the latest supported" both resolve to this server's one version.
-        imagePromptEnabled = await supportsAcpImagePrompts(ctx, config.provider, config.model)
+        imagePromptEnabled = modelCatalog === undefined
+          ? await supportsAcpImagePrompts(ctx, config.provider, config.model)
+          : (await Promise.all(modelCatalog.models.map(model => (
+            supportsAcpImagePrompts(ctx, modelCatalog.provider, model.id)
+          )))).every(Boolean)
         return {
           protocolVersion: PROTOCOL_VERSION,
           agentInfo: { name: 'deepseek-harness-acp', version: '0.0.1' },
@@ -309,6 +324,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
         assertOpen()
         validateSessionParams(params)
         const sessionId = SessionId(randomUUID())
+        const modelSelection = initialModelSelection(modelCatalog)
         // No preset composition: the ACP bundle keeps the model-facing rows in
         // the host plane, so this agent reads them from the global layer. A
         // deployment that configures a roster has to join one here first
@@ -317,6 +333,13 @@ export function apply(ctx: Context, config: AcpConfig): void {
           sessionId,
           meta: { cwd: params.cwd },
           agentOptions: agentOptions(config),
+          ...modelSelection === undefined
+            ? {}
+            : {
+              setup(agentCtx): void {
+                installModelSelection(agentCtx, modelSelection)
+              },
+            },
         })
         /* v8 ignore next 4 -- a real stdio close can race an in-flight create. */
         if (closed) {
@@ -325,12 +348,41 @@ export function apply(ctx: Context, config: AcpConfig): void {
         }
         sessions.set(sessionId, {
           agent: handle.agent,
+          modelSelection,
           dispose: () => handle.dispose(),
           outputTail: Promise.resolve(),
           inflight: undefined,
         })
-        return { sessionId }
+        return {
+          sessionId,
+          ...modelCatalog === undefined || modelSelection?.current === undefined
+            ? {}
+            : { configOptions: modelConfigOptions(modelCatalog, modelSelection.current.model) },
+        }
       },
+
+      ...modelCatalog === undefined
+        ? {}
+        : {
+          setSessionConfigOption(params: SetSessionConfigOptionRequest): Promise<SetSessionConfigOptionResponse> {
+            assertOpen()
+            const record = requireSession(SessionId(params.sessionId))
+            if (params.configId !== MODEL_CONFIG_ID) {
+              throw invalidParams(`unknown session config option: ${params.configId}`)
+            }
+            if (typeof params.value !== 'string' || !modelCatalog.modelIds.has(params.value)) {
+              throw invalidParams(`unknown model: ${String(params.value)}`)
+            }
+            if (record.inflight !== undefined) {
+              throw invalidParams('model cannot be changed while a prompt is in flight')
+            }
+            const selection = record.modelSelection
+            /* v8 ignore next -- every session created by this handler receives a selection. */
+            if (selection === undefined) throw internalError('session model selection is unavailable')
+            selection.current = { provider: modelCatalog.provider, model: params.value }
+            return Promise.resolve({ configOptions: modelConfigOptions(modelCatalog, params.value) })
+          },
+        },
 
       async prompt(params: PromptRequest): Promise<PromptResponse> {
         assertOpen()
@@ -521,6 +573,15 @@ export function apply(ctx: Context, config: AcpConfig): void {
   /* v8 ignore stop */
 
   ctx.effect(() => quiesce, 'acp.connection')
+}
+
+/** Create one independent mutable selector for a newly admitted ACP session. */
+function initialModelSelection(catalog: AcpModelCatalog | undefined): ModelSelectionRef | undefined {
+  if (catalog === undefined) return undefined
+  return {
+    current: { provider: catalog.provider, model: catalog.initialModel },
+    assembled: undefined,
+  }
 }
 
 /**

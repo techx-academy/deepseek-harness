@@ -74,6 +74,22 @@ describe('ACP multi-session isolation', () => {
     await expect(pendingB).resolves.toEqual({ stopReason: 'cancelled' })
   })
 
+  it('keeps model selection isolated per session', async () => {
+    harness = await makeBridgeHarness({
+      config: { modelSelection: true },
+      script: [textResponse('A'), textResponse('B')],
+    })
+    await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const a = (await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })).sessionId
+    const b = (await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })).sessionId
+    await harness.client.setSessionConfigOption({ sessionId: a, configId: 'model', value: 'mock-alt' })
+
+    await harness.client.prompt({ sessionId: a, prompt: [{ type: 'text', text: 'A' }] })
+    await harness.client.prompt({ sessionId: b, prompt: [{ type: 'text', text: 'B' }] })
+
+    expect(harness.adapter.requests.map(request => request.model)).toEqual(['mock-alt', 'mock'])
+  })
+
   it('drains every live session on bridge disposal', async () => {
     harness = await makeBridgeHarness({ script: ['hang', 'hang'] })
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })

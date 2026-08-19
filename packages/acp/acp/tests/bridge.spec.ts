@@ -66,6 +66,96 @@ describe('automation-only ACP bridge', () => {
     expect(harness.adapter.requests[0]?.messages.at(-1)?.content).toEqual([{ type: 'text', text: 'say hello' }])
   })
 
+  it('projects the provider catalog and routes a session through the selected model', async () => {
+    harness = await makeBridgeHarness({
+      config: { modelSelection: true },
+      persona: 'Automation persona for {{model}}.',
+      script: [textResponse('selected')],
+    })
+    await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const created = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
+
+    expect(created.configOptions).toEqual([{
+      id: 'model',
+      name: 'Model',
+      description: 'Model used by this session.',
+      category: 'model',
+      type: 'select',
+      currentValue: 'mock',
+      options: [
+        { value: 'mock', name: 'Mock', description: 'Default mock model.' },
+        { value: 'mock-alt', name: 'Mock Alt' },
+      ],
+    }])
+    await expect(harness.client.setSessionConfigOption({
+      sessionId: created.sessionId,
+      configId: 'model',
+      value: 'mock-alt',
+    })).resolves.toEqual({
+      configOptions: [expect.objectContaining({ currentValue: 'mock-alt' })],
+    })
+    await harness.client.prompt({
+      sessionId: created.sessionId,
+      prompt: [{ type: 'text', text: 'use selected model' }],
+    })
+
+    expect(harness.adapter.requests[0]).toMatchObject({ model: 'mock-alt' })
+    expect(harness.adapter.requests[0]?.system).toContain('Automation persona for mock-alt.')
+  })
+
+  it('rejects invalid session model changes without mutating the current selection', async () => {
+    harness = await makeBridgeHarness({ config: { modelSelection: true } })
+    await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const created = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
+
+    await expect(harness.client.setSessionConfigOption({
+      sessionId: created.sessionId,
+      configId: 'unknown',
+      value: 'mock-alt',
+    })).rejects.toThrow(/unknown session config option/)
+    await expect(harness.client.setSessionConfigOption({
+      sessionId: created.sessionId,
+      configId: 'model',
+      value: 'missing',
+    })).rejects.toThrow(/unknown model/)
+    await expect(harness.client.setSessionConfigOption({
+      sessionId: created.sessionId,
+      configId: 'model',
+      type: 'boolean',
+      value: true,
+    })).rejects.toThrow(/unknown model/)
+    expect(harness.ctx.agents.get(SessionId(created.sessionId))?.options.model).toBe('mock')
+  })
+
+  it('rejects a model change while the session has a prompt in flight', async () => {
+    harness = await makeBridgeHarness({ config: { modelSelection: true }, script: ['hang'] })
+    await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const { sessionId } = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
+    const prompt = harness.client.prompt({ sessionId, prompt: [{ type: 'text', text: 'wait' }] })
+    await vi.waitFor(() => { expect(harness!.ctx.agents.get(SessionId(sessionId))?.status).toBe('running') })
+
+    await expect(harness.client.setSessionConfigOption({
+      sessionId,
+      configId: 'model',
+      value: 'mock-alt',
+    })).rejects.toThrow(/while a prompt is in flight/)
+    await harness.client.cancel({ sessionId })
+    await expect(prompt).resolves.toEqual({ stopReason: 'cancelled' })
+  })
+
+  it('fails loud when model selection has no exact default route', async () => {
+    await expect(makeBridgeHarness({
+      config: { modelSelection: true },
+      emptyCatalog: true,
+    })).rejects.toThrow(/requires a non-empty catalog/)
+    await expect(makeBridgeHarness({
+      config: { model: 'missing', modelSelection: true },
+    })).rejects.toThrow(/default model "missing" is absent/)
+    await expect(makeBridgeHarness({
+      config: { provider: undefined, model: undefined, modelSelection: true },
+    })).rejects.toThrow(/requires both provider and model/)
+  })
+
   it('leaves absent agent targets for request listeners to supply', async () => {
     harness = await makeBridgeHarness({ config: { provider: undefined, model: undefined } })
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })

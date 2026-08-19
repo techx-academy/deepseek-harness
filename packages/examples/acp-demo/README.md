@@ -14,7 +14,7 @@ ACP automation server app: the default agent spine, client-created agents throug
 | `@deepseek-ai/dsh-session-query-sqlite` | Derived exact/FTS session-query service, opened before the ACP transport so leaf consumers are ready for the first model request. |
 | `@deepseek-ai/dsh-acp` | Automation-only ACP transport over stdin/stdout. |
 
-The app does not install commands, user interaction, session navigation, configuration pickers, or a stdout logger. It owns these plugins through one ordered effect so the query service is ready before ACP accepts work and ACP sessions quiesce before checkpointing and persistence detach. Leaf configurations supply LLM, executor, sandbox, approval, filesystem, and model-facing tool plugins.
+The app does not install commands, user interaction, session navigation, non-model configuration pickers, or a stdout logger. It owns these plugins through one ordered effect so the query service is ready before ACP accepts work and ACP sessions quiesce before checkpointing and persistence detach. Leaf configurations supply LLM, executor, sandbox, approval, filesystem, and model-facing tool plugins.
 
 ## Config
 
@@ -22,6 +22,7 @@ The app does not install commands, user interaction, session navigation, configu
 |---|---|---|
 | `provider` | required | Provider route for each ACP-created agent. |
 | `model` | required | Model for each ACP-created agent. |
+| `modelSelection` | `false` | Expose the provider's adapter-owned model catalog as a session-local standard ACP selector. |
 | `maxParallelToolCalls` | agent-loop default | Positive-integer tool-call concurrency cap; `1` is serial. |
 | `persona` | — | Deployment persona template for `dsh-system-prompt`. |
 | `toolOrder` | lexicographic | Explicit model-facing tool order for `dsh-system-prompt`. |

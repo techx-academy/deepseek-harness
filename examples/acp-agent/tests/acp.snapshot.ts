@@ -47,6 +47,7 @@ const CHILD_QUESTION_CONFIG = fileURLToPath(new URL('../child-question.cordis.ym
 const SESSION_SANDBOX_ROOT_CONFIG = fileURLToPath(new URL('../session-sandbox-root.cordis.yml', import.meta.url))
 const RETRY_CONFIG = fileURLToPath(new URL('../retry.cordis.yml', import.meta.url))
 const SESSION_TITLE_CONFIG = fileURLToPath(new URL('../session-title.cordis.yml', import.meta.url))
+const MODEL_SELECTION_CONFIG = fileURLToPath(new URL('../model-selection.cordis.yml', import.meta.url))
 const SUBAGENT_REPORT_QUIET_CONFIG = fileURLToPath(
   new URL('../subagent-report-quiet.cordis.yml', import.meta.url),
 )
@@ -133,6 +134,12 @@ function snapshotModeFromEnv(value: string | undefined): SnapshotSuiteOptions['m
 
 const SCENARIOS: Scenario[] = [
   { name: 'handshake', hasModelTurn: false, recorded: false },
+  {
+    name: 'model-selection',
+    hasModelTurn: false,
+    recorded: false,
+    configPath: MODEL_SELECTION_CONFIG,
+  },
   { name: 'reject-extra-dirs', hasModelTurn: false, recorded: false },
   // text-turn is the default header pin and owns the prompt and tool-schema
   // sidecars reused by alternate classes with identical component sequences.

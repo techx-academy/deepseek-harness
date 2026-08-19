@@ -69,6 +69,7 @@ export type InputStep =
   | { op: 'initialize' }
   | { op: 'newSession' }
   | { op: 'newSessionExpectError'; additionalDirectories?: string[] }
+  | { op: 'setModel'; model: string }
   | { op: 'prompt'; text: string }
   | { op: 'promptContent'; content: AcpContentBlock[] }
   | { op: 'promptAndWaitForAgentMessage'; text: string; waitForText: string }
@@ -416,6 +417,12 @@ async function runStep(
         () => { throw new Error('snapshot-harness: expected session/new to be rejected but it succeeded') },
         () => { /* expected: the bridge rejected the unsupported workspace scope */ },
       )
+      return
+    }
+    case 'setModel': {
+      const sessionId = getSessionId()
+      if (sessionId === undefined) throw new Error('snapshot-harness: setModel before newSession')
+      await client.setSessionConfigOption({ sessionId, configId: 'model', value: step.model })
       return
     }
     case 'prompt': {

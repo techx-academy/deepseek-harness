@@ -80,10 +80,13 @@ async function makeConsumer(): Promise<string> {
   await writeFile(join(dir, 'mock-llm.mjs'), [
     "import { LlmAdapter } from '@deepseek-ai/dsh-llm'",
     'class Mock extends LlmAdapter {',
-    '  async * stream() {',
+    "  providerInfo() { return { id: 'built-acp-mock', name: 'Built ACP Mock' } }",
+    "  listModels() { return Promise.resolve([{ provider: 'built-acp-mock', id: 'built-acp-mock', name: 'Built Default' }, { provider: 'built-acp-mock', id: 'built-acp-alt', name: 'Built Alt' }]) }",
+    '  async * stream(options) {',
+    '    const text = `ACP BUILT ${options.model}`',
     "    yield { type: 'block-start', index: 0, blockType: 'text' }",
-    "    yield { type: 'text-delta', index: 0, text: 'ACP BUILT OK' }",
-    "    yield { type: 'block-end', index: 0, block: { type: 'text', text: 'ACP BUILT OK' } }",
+    "    yield { type: 'text-delta', index: 0, text }",
+    "    yield { type: 'block-end', index: 0, block: { type: 'text', text } }",
     "    yield { type: 'finish', reason: { kind: 'stop' } }",
     '  }',
     '}',
@@ -104,6 +107,7 @@ async function makeConsumer(): Promise<string> {
     '  config:',
     '    provider: built-acp-mock',
     '    model: built-acp-mock',
+    '    modelSelection: true',
     '    persona: \'test agent\'',
     '    workspaceContext: false',
     '',
@@ -172,12 +176,24 @@ describe.skipIf(!existsSync(acpBin))('dsh-acp-demo BUILT bin (node lib/bin.js, n
       promptCapabilities: { image: false, audio: false, embeddedContext: false },
     })
     const sessionCwd = consumer
-    const { sessionId } = await client.newSession({ cwd: sessionCwd, mcpServers: [] })
+    const created = await client.newSession({ cwd: sessionCwd, mcpServers: [] })
+    expect(created.configOptions).toEqual([expect.objectContaining({
+      id: 'model',
+      currentValue: 'built-acp-mock',
+    })])
+    const { sessionId } = created
+    await expect(client.setSessionConfigOption({
+      sessionId,
+      configId: 'model',
+      value: 'built-acp-alt',
+    })).resolves.toEqual({
+      configOptions: [expect.objectContaining({ currentValue: 'built-acp-alt' })],
+    })
     const result = await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'reply' }] })
     expect(result.stopReason).toBe('end_turn')
     await expect.poll(() => updates).toEqual([{
       sessionUpdate: 'agent_message_chunk',
-      content: { type: 'text', text: 'ACP BUILT OK' },
+      content: { type: 'text', text: 'ACP BUILT built-acp-alt' },
     }])
     const sessionsRoot = join(sessionCwd, '.sessions')
     let log: string | undefined

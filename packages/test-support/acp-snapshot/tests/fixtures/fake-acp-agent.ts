@@ -218,6 +218,18 @@ function handleFrame(frame: Record<string, unknown>): void {
     case 'session/prompt':
       void handlePrompt(id as number | string)
       return
+    case 'session/set_config_option':
+      respond(id as number | string, {
+        configOptions: [{
+          id: params.configId,
+          name: 'Model',
+          category: 'model',
+          type: 'select',
+          currentValue: params.value,
+          options: [{ value: params.value, name: String(params.value) }],
+        }],
+      })
+      return
     case 'session/cancel':
       if (parkedPromptId !== null) {
         const parked = parkedPromptId

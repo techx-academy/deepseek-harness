@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 Automation-only [Agent Client Protocol](https://agentclientprotocol.com) server over JSON-RPC stdio. Programmatic clients create fresh harness agents, send text/image prompts, collect committed assistant text/images, resolve one-shot permission requests by policy, and cancel work. The primary in-repository client is [`dsh-subagent-acp`](../../subagent/subagent-acp/README.md).
 
-This package is a transport adapter, not a UI integration or a capability seam. It does not expose editor navigation, transcript replay, commands, modes, configuration pickers, elicitation, reasoning, plans, titles, or tool presentation. Interactive rendering and human questions belong to the Web host and client modules.
+This package is a transport adapter, not a UI integration or a general capability seam. A deployment may opt into the standard ACP session model selector backed by its adapter-owned catalog. The bridge does not expose editor navigation, transcript replay, commands, modes, other configuration pickers, elicitation, reasoning, plans, titles, or tool presentation. Interactive rendering and human questions belong to the Web host and client modules.
 
 ## Plugin
 
@@ -14,22 +14,24 @@ This package is a transport adapter, not a UI integration or a capability seam. 
 |---|---|---|
 | `provider` | — | Initial provider route for every created agent. |
 | `model` | — | Initial model for every created agent. |
+| `modelSelection` | `false` | Load the configured provider's model catalog at startup and expose it as a session-local standard ACP model selector. |
 
-Both fields are optional so another agent/request listener may supply the target. The runnable ACP composition requires both.
+`provider` and `model` remain optional when model selection is disabled so another agent/request listener may supply the target. Enabling `modelSelection` requires both fields, a non-empty adapter catalog, and the configured model in that catalog; startup fails loud otherwise.
 
 ## Protocol contract
 
 | Method | Behavior |
 |---|---|
-| `initialize` | Negotiates the supported version. Image prompts are advertised only when a durable attachment store is mounted and the configured exact provider/model resolves with explicit image input; audio and embedded context stay false. No session, editor, terminal, filesystem, or MCP capability is advertised. |
+| `initialize` | Negotiates the supported version. Image prompts are advertised only when a durable attachment store is mounted and every selectable model (or the fixed configured route) resolves with explicit image input; audio and embedded context stay false. No session, editor, terminal, filesystem, or MCP capability is advertised. |
 | `authenticate` | No-op because the server advertises no authentication methods. |
-| `session/new` | Creates a fresh agent with an absolute primary `cwd`; empty `additionalDirectories` and `mcpServers` are accepted, non-empty values reject. |
+| `session/new` | Creates a fresh agent with an absolute primary `cwd`; empty `additionalDirectories` and `mcpServers` are accepted, non-empty values reject. When enabled, returns one standard `model` config option whose values preserve adapter catalog order and metadata. |
+| `session/set_config_option` | When model selection is enabled, changes only the addressed idle session's model and returns the complete current option set. Unknown options, non-catalog values, boolean values, and changes during a prompt reject without mutation. |
 | `session/prompt` | Preserves ordered text and supported inline image blocks, renders resource links as bracketed textual references, and rejects audio, embedded resources, malformed/empty input, or an image when capability was not advertised. It validates the whole image batch and rechecks the session's latest exact route before any save, commits every image before the user event, permits one in-flight request per session, and waits for admission plus, once queued, whole-Agent idle and ordered output delivery. Normal quiescence reports `end_turn`; explicit ACP cancellation, disposal, or a prompt whose admission was discarded (a turnless slot) reports `cancelled`. |
 | `session/cancel` | Marks and aborts any in-progress admission without cancelling or waiting for unrelated Agent work; once this prompt has entered the Agent inbox, it cancels the addressed Agent and waits for the owned interval to quiesce. No late user message is published and the prompt settles as `cancelled`. With no in-flight prompt it cancels autonomous work; unknown ids are no-ops. |
 | `session/update` | Emits one `agent_message_chunk` per non-empty text or image block in a committed `assistant/message`, preserving order. Images are re-read and integrity-verified before inline base64 delivery. Raw deltas and non-message events are omitted. |
 | `session/request_permission` | Offers one-shot allow/reject choices for bridge-owned approval requests carrying a tool call id. Clients may answer automatically. |
 
-One connection may own several sessions. The bridge keys records by branded session id and checks exact agent identity before routing events or permission requests. Each session has an independent prompt slot, workspace, cancellation path, and disposer.
+One connection may own several sessions. The bridge keys records by branded session id and checks exact agent identity before routing events or permission requests. Each session has an independent model selection, prompt slot, workspace, cancellation path, and disposer. Selection is installed through the Agent's scoped model-routing primitive, so prompt variables and request routing observe the same per-step snapshot.
 
 Committed-message output intentionally trades token-by-token latency for a clean automation result. Uncommitted provider chunks and retry attempts cannot leak partial text or images; reasoning and tool activity remain in the session log for observability through other interfaces. Per-session delivery is serialized because attachment reads are asynchronous, and a missing or corrupt committed image fails the prompt response instead of emitting a placeholder.
 

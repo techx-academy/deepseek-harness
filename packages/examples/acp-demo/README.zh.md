@@ -14,7 +14,7 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 | `@deepseek-ai/dsh-session-query-sqlite` | 派生的精确／FTS 会话查询服务；先于 ACP 传输打开，使叶节点消费方在首次模型请求前就绪。 |
 | `@deepseek-ai/dsh-acp` | 通过 stdin／stdout 提供的纯自动化 ACP 传输。 |
 
-应用不安装命令、用户交互、会话导航、配置选择器或 stdout logger。它通过一个有序 effect 拥有这些插件，因此查询服务会在 ACP 接受工作前就绪，而 ACP 会话会在检查点与持久化插件卸载前完全停稳。叶节点配置负责提供 LLM（大语言模型）、执行器、沙箱、审批、文件系统和面向模型的工具插件。
+应用不安装命令、用户交互、会话导航、模型之外的配置选择器或 stdout logger。它通过一个有序 effect 拥有这些插件，因此查询服务会在 ACP 接受工作前就绪，而 ACP 会话会在检查点与持久化插件卸载前完全停稳。叶节点配置负责提供 LLM（大语言模型）、执行器、沙箱、审批、文件系统和面向模型的工具插件。
 
 ## 配置
 
@@ -22,6 +22,7 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 |---|---|---|
 | `provider` | 必填 | 每个由 ACP 创建的 agent 所用的提供方路由。 |
 | `model` | 必填 | 每个由 ACP 创建的 agent 所用的模型。 |
+| `modelSelection` | `false` | 将提供方由适配器拥有的模型目录通过标准 ACP 暴露为会话局部选择器。 |
 | `maxParallelToolCalls` | agent loop（智能体循环）默认值 | 正整数工具调用并发上限；`1` 表示串行。 |
 | `persona` | 无 | 供 `dsh-system-prompt` 使用的部署 persona 模板。 |
 | `toolOrder` | 字典序 | 供 `dsh-system-prompt` 使用的显式面向模型工具顺序。 |

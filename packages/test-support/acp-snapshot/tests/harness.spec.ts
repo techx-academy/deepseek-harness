@@ -1087,6 +1087,15 @@ describe('runScenario', () => {
     expect(result.sessionId).toBeDefined()
   })
 
+  it('forwards a setModel step through the standard ACP method', { timeout: 20_000 }, async () => {
+    const { fixtureFile } = await scenario({})
+    const result = await runScenario(
+      { steps: [...boot, { op: 'setModel', model: 'mock-alt' }] },
+      { agent: AGENT, mode: 'replay', fixtureFile },
+    )
+    expect(result.rawStdout).toContain('"currentValue":"mock-alt"')
+  })
+
   it('a standalone cancel can wait for cwd-relative readiness', { timeout: 20_000 }, async () => {
     const { dir, fixtureFile } = await scenario({})
     const workspaceDir = join(dir, 'workspace')
@@ -1114,6 +1123,7 @@ describe('runScenario', () => {
   })
 
   it.each([
+    [{ op: 'setModel', model: 'mock' }, /setModel before newSession/],
     [{ op: 'prompt', text: 'x' }, /prompt before newSession/],
     [{ op: 'promptContent', content: [{ type: 'text', text: 'x' }] }, /promptContent before newSession/],
     [{ op: 'promptAndWaitForAgentMessage', text: 'x', waitForText: 'later' }, /promptAndWaitForAgentMessage before newSession/],

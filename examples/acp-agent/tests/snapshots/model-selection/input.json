@@ -1,0 +1,7 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "setModel", "model": "deepseek-v4-pro" }
+  ]
+}

@@ -41,6 +41,8 @@ export interface Config {
   provider: string
   /** Model name for ACP-created agents (must have a registered adapter). */
   model: string
+  /** Expose the provider's catalog as a session-local ACP model selector. */
+  modelSelection?: boolean
   /** Bundled agent-loop concurrency cap; `1` is serial and omission uses its default. */
   maxParallelToolCalls?: number
   /** Deployment persona (the system-prompt plugin's `persona` config). */
@@ -79,6 +81,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   provider: z.string().required(),
   model: z.string().required(),
+  modelSelection: z.boolean().default(false),
   maxParallelToolCalls: z.number().step(1).min(1),
   persona: z.string(),
   // The array default is forced to undefined: ABSENT means "lexicographic
@@ -134,7 +137,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     const query = ctx.plugin(SqliteSessionQueryEngine, { path: join(persistenceRoot, 'session-query.db') })
     await query
     yield query.dispose
-    const transport = ctx.plugin(acp, { provider: config.provider, model: config.model })
+    const transport = ctx.plugin(acp, {
+      provider: config.provider,
+      model: config.model,
+      ...config.modelSelection === undefined ? {} : { modelSelection: config.modelSelection },
+    })
     await transport
     yield transport.dispose
   }, 'acp-demo.composition')

@@ -15,7 +15,7 @@
 
 ## `@deepseek-ai/dsh-acp`
 
-需要：`agents`
+需要：`agents` · `llm`
 
 ```ts config-catalog
 /** Plugin config: the provider/model selection used for each ACP-created agent. */
@@ -24,6 +24,8 @@ export interface AcpConfig {
   provider?: string
   /** Model name for created agents. */
   model?: string
+  /** Expose the configured provider's model catalog as a session-local ACP selector. */
+  modelSelection?: boolean
   /** Runtime-only transport override; production uses stdio. */
   stream?: Stream
 }
@@ -31,7 +33,7 @@ export interface AcpConfig {
 
 依赖：`Stream`（`@agentclientprotocol/sdk`）
 
-来源：[`packages/acp/acp/src/index.ts:71`](../packages/acp/acp/src/index.ts)
+来源：[`packages/acp/acp/src/index.ts:74`](../packages/acp/acp/src/index.ts)
 
 <a id="deepseek-aidsh-acp-demo"></a>
 
@@ -51,6 +53,8 @@ export interface Config {
   provider: string
   /** Model name for ACP-created agents (must have a registered adapter). */
   model: string
+  /** Expose the provider's catalog as a session-local ACP model selector. */
+  modelSelection?: boolean
   /** Bundled agent-loop concurrency cap; `1` is serial and omission uses its default. */
   maxParallelToolCalls?: number
   /** Deployment persona (the system-prompt plugin's `persona` config). */
