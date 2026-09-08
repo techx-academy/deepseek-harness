@@ -2,7 +2,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionConfigOption } from '@agentclientprotocol/sdk'
-import type { LlmModelInfo } from '@deepseek-ai/dsh-llm'
+import { ReasoningEffortId, type LlmModelInfo } from '@deepseek-ai/dsh-llm'
 
 /** Stable ACP identifier for the session-local model selector. */
 export const MODEL_CONFIG_ID = 'model'
@@ -17,6 +17,8 @@ export interface AcpModelCatalog {
   models: readonly LlmModelInfo[]
   /** Exact model ids accepted by session/set_config_option. */
   modelIds: ReadonlySet<string>
+  /** Validated adapter-owned effort selected together with each model. */
+  reasoningDefaults: ReadonlyMap<string, ReasoningEffortId>
 }
 
 /**
@@ -26,12 +28,14 @@ export interface AcpModelCatalog {
  * @param ctx - Bridge context carrying the injected LLM runtime.
  * @param provider - Deployment-owned provider route.
  * @param initialModel - Model selected for each new session.
+ * @param reasoningDefaults - Deployment-owned model defaults; omission leaves provider behavior.
  * @returns the detached, validated catalog and exact accepted model ids.
  */
 export async function loadAcpModelCatalog(
   ctx: Context,
   provider: string | undefined,
   initialModel: string | undefined,
+  reasoningDefaults: Readonly<Record<string, string>> = {},
 ): Promise<AcpModelCatalog> {
   if (provider === undefined || initialModel === undefined) {
     throw new Error('ACP model selection requires both provider and model')
@@ -44,7 +48,18 @@ export async function loadAcpModelCatalog(
   if (!modelIds.has(initialModel)) {
     throw new Error(`ACP default model "${initialModel}" is absent from provider "${provider}"`)
   }
-  return { provider, initialModel, models, modelIds }
+  const defaults = new Map<string, ReasoningEffortId>()
+  for (const [model, effort] of Object.entries(reasoningDefaults)) {
+    if (!modelIds.has(model)) {
+      throw new Error(`ACP reasoning default names unknown model "${model}"`)
+    }
+    const resolved = await ctx.llm.resolveModelInfo(provider, model)
+    if (!resolved.reasoning?.efforts.some(candidate => candidate.id === effort)) {
+      throw new Error(`ACP model "${model}" does not support reasoning effort "${effort}"`)
+    }
+    defaults.set(model, ReasoningEffortId(effort))
+  }
+  return { provider, initialModel, models, modelIds, reasoningDefaults: defaults }
 }
 
 /**

@@ -23,6 +23,7 @@ The app does not install commands, user interaction, session navigation, non-mod
 | `provider` | required | Provider route for each ACP-created agent. |
 | `model` | required | Model for each ACP-created agent. |
 | `modelSelection` | `false` | Expose the provider's adapter-owned model catalog as a session-local standard ACP selector. |
+| `modelReasoningDefaults` | `{}` | Per-model adapter-native reasoning defaults, validated and applied by [`dsh-acp`](../../acp/acp/README.md). |
 | `maxParallelToolCalls` | agent-loop default | Positive-integer tool-call concurrency cap; `1` is serial. |
 | `persona` | — | Deployment persona template for `dsh-system-prompt`. |
 | `toolOrder` | lexicographic | Explicit model-facing tool order for `dsh-system-prompt`. |

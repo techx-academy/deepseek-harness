@@ -43,6 +43,8 @@ export interface Config {
   model: string
   /** Expose the provider's catalog as a session-local ACP model selector. */
   modelSelection?: boolean
+  /** Adapter-owned model reasoning defaults forwarded to the ACP selector. */
+  modelReasoningDefaults?: Record<string, string>
   /** Bundled agent-loop concurrency cap; `1` is serial and omission uses its default. */
   maxParallelToolCalls?: number
   /** Deployment persona (the system-prompt plugin's `persona` config). */
@@ -82,6 +84,7 @@ export const Config: z<Config> = z.object({
   provider: z.string().required(),
   model: z.string().required(),
   modelSelection: z.boolean().default(false),
+  modelReasoningDefaults: z.dict(z.string()),
   maxParallelToolCalls: z.number().step(1).min(1),
   persona: z.string(),
   // The array default is forced to undefined: ABSENT means "lexicographic
@@ -141,6 +144,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       provider: config.provider,
       model: config.model,
       ...config.modelSelection === undefined ? {} : { modelSelection: config.modelSelection },
+      ...config.modelReasoningDefaults === undefined ? {} : { modelReasoningDefaults: config.modelReasoningDefaults },
     })
     await transport
     yield transport.dispose

@@ -28,6 +28,7 @@ class MockAdapter extends LlmAdapter {
     private readonly script: (StreamChunk[] | 'hang')[],
     private readonly imageCapable: boolean,
     private readonly emptyCatalog: boolean,
+    private readonly models: readonly LlmResolvedModelInfo[] | undefined,
   ) {
     super()
   }
@@ -39,6 +40,7 @@ class MockAdapter extends LlmAdapter {
 
   override listModels(provider: string) {
     if (this.emptyCatalog) return Promise.resolve([])
+    if (this.models !== undefined) return Promise.resolve(this.models)
     return Promise.resolve(provider === 'mock' ? [
       {
         provider: 'mock',
@@ -57,6 +59,8 @@ class MockAdapter extends LlmAdapter {
   }
 
   override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+    const configured = this.models?.find(candidate => candidate.id === model)
+    if (configured !== undefined) return Promise.resolve(configured)
     return Promise.resolve({
       provider,
       id: model,
@@ -191,8 +195,9 @@ export async function makeBridgeHarness(options: {
   imageCapable?: boolean
   attachments?: boolean
   emptyCatalog?: boolean
+  models?: readonly LlmResolvedModelInfo[]
 } = {}): Promise<BridgeHarness> {
-  const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true, options.emptyCatalog === true)
+  const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true, options.emptyCatalog === true, options.models)
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { persona: options.persona ?? '' } })
   if (options.attachments !== false) await ctx.plugin(MemoryAttachmentStore)

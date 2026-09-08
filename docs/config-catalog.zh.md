@@ -26,6 +26,8 @@ export interface AcpConfig {
   model?: string
   /** Expose the configured provider's model catalog as a session-local ACP selector. */
   modelSelection?: boolean
+  /** Adapter-owned effort defaults applied atomically with each session model selection. */
+  modelReasoningDefaults?: Record<string, string>
   /** Runtime-only transport override; production uses stdio. */
   stream?: Stream
 }
@@ -55,6 +57,8 @@ export interface Config {
   model: string
   /** Expose the provider's catalog as a session-local ACP model selector. */
   modelSelection?: boolean
+  /** Adapter-owned model reasoning defaults forwarded to the ACP selector. */
+  modelReasoningDefaults?: Record<string, string>
   /** Bundled agent-loop concurrency cap; `1` is serial and omission uses its default. */
   maxParallelToolCalls?: number
   /** Deployment persona (the system-prompt plugin's `persona` config). */

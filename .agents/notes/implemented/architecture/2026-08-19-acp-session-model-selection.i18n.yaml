@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-acp-session-model-selection.md
-2026-08-19-acp-session-model-selection.md: f9c4617aed173b057923f4f8be4cddffd9bc5c94
-2026-08-19-acp-session-model-selection.zh.md: bc63a7dfd479a37c6cb76cde874d2ddf08a3a202
+2026-08-19-acp-session-model-selection.md: ee31a15998cb900b8f2f5bade53f47ce8fd0e4a7
+2026-08-19-acp-session-model-selection.zh.md: 14206a95b28f6f851b17d05771c3bb783c16a318

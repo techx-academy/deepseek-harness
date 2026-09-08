@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { makeBridgeHarness, textResponse, type BridgeHarness, type CapturedUpdate } from './harness.ts'
 
 function messageTextFor(
@@ -88,6 +89,36 @@ describe('ACP multi-session isolation', () => {
     await harness.client.prompt({ sessionId: b, prompt: [{ type: 'text', text: 'B' }] })
 
     expect(harness.adapter.requests.map(request => request.model)).toEqual(['mock-alt', 'mock'])
+  })
+
+  it('switches each session model and its reasoning default atomically', async () => {
+    const defaults = { high: 'high', medium: 'medium', disabled: 'off' }
+    harness = await makeBridgeHarness({
+      config: { modelSelection: true, model: 'high', modelReasoningDefaults: defaults },
+      models: ['high', 'auto', 'medium', 'disabled'].map(id => ({
+        provider: 'mock', id, name: id,
+        ...id === 'auto' ? {} : {
+          reasoning: { efforts: ['off', 'medium', 'high'].map(effort => ({ id: ReasoningEffortId(effort), name: effort })) },
+        },
+      })),
+      script: Array.from({ length: 7 }, () => textResponse('done')),
+    })
+    await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const a = (await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })).sessionId
+    const b = (await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })).sessionId
+    for (const model of ['high', 'auto', 'medium', 'disabled', 'high']) {
+      await harness.client.setSessionConfigOption({ sessionId: a, configId: 'model', value: model })
+      await harness.client.prompt({ sessionId: a, prompt: [{ type: 'text', text: model }] })
+      if (model === 'auto') {
+        await harness.client.prompt({ sessionId: b, prompt: [{ type: 'text', text: 'unchanged startup default' }] })
+      }
+    }
+    const fresh = (await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })).sessionId
+    await harness.client.prompt({ sessionId: fresh, prompt: [{ type: 'text', text: 'fresh' }] })
+    expect(harness.adapter.requests.map(({ model, reasoningEffort }) => [model, reasoningEffort])).toEqual([
+      ['high', 'high'], ['auto', undefined], ['high', 'high'], ['medium', 'medium'],
+      ['disabled', 'off'], ['high', 'high'], ['high', 'high'],
+    ])
   })
 
   it('drains every live session on bridge disposal', async () => {
