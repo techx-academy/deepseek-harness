@@ -2,6 +2,10 @@
   "steps": [
     { "op": "initialize" },
     { "op": "newSession" },
-    { "op": "setModel", "model": "deepseek-v4-pro" }
+    { "op": "prompt", "text": "Reply with exactly the word: PONG. Do not use any tools." },
+    { "op": "setModel", "model": "deepseek-v4-pro" },
+    { "op": "prompt", "text": "Reply with exactly the word: PONG. Do not use any tools." },
+    { "op": "setModel", "model": "deepseek-v4-flash" },
+    { "op": "prompt", "text": "Reply with exactly the word: PONG. Do not use any tools." }
   ]
 }

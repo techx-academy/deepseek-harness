@@ -156,6 +156,18 @@ describe('automation-only ACP bridge', () => {
     })).rejects.toThrow(/requires both provider and model/)
   })
 
+  it('rejects reasoning defaults without a selector or exact adapter capability', async () => {
+    await expect(makeBridgeHarness({
+      config: { modelReasoningDefaults: { mock: 'high' } },
+    })).rejects.toThrow(/require modelSelection/)
+    await expect(makeBridgeHarness({
+      config: { modelSelection: true, modelReasoningDefaults: { missing: 'high' } },
+    })).rejects.toThrow(/unknown model/)
+    await expect(makeBridgeHarness({
+      config: { modelSelection: true, modelReasoningDefaults: { mock: 'high' } },
+    })).rejects.toThrow(/does not support reasoning effort/)
+  })
+
   it('leaves absent agent targets for request listeners to supply', async () => {
     harness = await makeBridgeHarness({ config: { provider: undefined, model: undefined } })
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })

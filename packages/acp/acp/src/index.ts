@@ -78,14 +78,17 @@ export interface AcpConfig {
   model?: string
   /** Expose the configured provider's model catalog as a session-local ACP selector. */
   modelSelection?: boolean
+  /** Adapter-owned effort defaults applied atomically with each session model selection. */
+  modelReasoningDefaults?: Record<string, string>
   /** Runtime-only transport override; production uses stdio. */
   stream?: Stream
 }
 
-export const Config: Schema<AcpConfig> = Schema.object({
+export const Config: Schema<Omit<AcpConfig, 'stream'>> = Schema.object({
   provider: Schema.string(),
   model: Schema.string(),
   modelSelection: Schema.boolean().default(false),
+  modelReasoningDefaults: Schema.dict(Schema.string()),
 })
 
 /** Per-session protocol state. */
@@ -131,8 +134,11 @@ export async function apply(ctx: Context, config: AcpConfig): Promise<void> {
   // injected service during apply rather than reading it lazily in a callback.
   const agents = ctx.agents
   const logger = ctx.logger
+  if (config.modelSelection !== true && Object.keys(config.modelReasoningDefaults ?? {}).length > 0) {
+    throw new Error('ACP model reasoning defaults require modelSelection')
+  }
   const modelCatalog = config.modelSelection === true
-    ? await loadAcpModelCatalog(ctx, config.provider, config.model)
+    ? await loadAcpModelCatalog(ctx, config.provider, config.model, config.modelReasoningDefaults)
     : undefined
   const sessions = new Map<SessionId, SessionRecord>()
   let closed = false
@@ -379,7 +385,12 @@ export async function apply(ctx: Context, config: AcpConfig): Promise<void> {
             const selection = record.modelSelection
             /* v8 ignore next -- every session created by this handler receives a selection. */
             if (selection === undefined) throw internalError('session model selection is unavailable')
-            selection.current = { provider: modelCatalog.provider, model: params.value }
+            const reasoningEffort = modelCatalog.reasoningDefaults.get(params.value)
+            selection.current = {
+              provider: modelCatalog.provider,
+              model: params.value,
+              ...reasoningEffort === undefined ? {} : { reasoningEffort },
+            }
             return Promise.resolve({ configOptions: modelConfigOptions(modelCatalog, params.value) })
           },
         },
@@ -578,8 +589,13 @@ export async function apply(ctx: Context, config: AcpConfig): Promise<void> {
 /** Create one independent mutable selector for a newly admitted ACP session. */
 function initialModelSelection(catalog: AcpModelCatalog | undefined): ModelSelectionRef | undefined {
   if (catalog === undefined) return undefined
+  const reasoningEffort = catalog.reasoningDefaults.get(catalog.initialModel)
   return {
-    current: { provider: catalog.provider, model: catalog.initialModel },
+    current: {
+      provider: catalog.provider,
+      model: catalog.initialModel,
+      ...reasoningEffort === undefined ? {} : { reasoningEffort },
+    },
     assembled: undefined,
   }
 }

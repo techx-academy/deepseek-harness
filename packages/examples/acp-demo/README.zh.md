@@ -23,6 +23,7 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 | `provider` | 必填 | 每个由 ACP 创建的 agent 所用的提供方路由。 |
 | `model` | 必填 | 每个由 ACP 创建的 agent 所用的模型。 |
 | `modelSelection` | `false` | 将提供方由适配器拥有的模型目录通过标准 ACP 暴露为会话局部选择器。 |
+| `modelReasoningDefaults` | `{}` | 逐模型的适配器原生推理默认值，由 [`dsh-acp`](../../acp/acp/README.md) 校验和应用。 |
 | `maxParallelToolCalls` | agent loop（智能体循环）默认值 | 正整数工具调用并发上限；`1` 表示串行。 |
 | `persona` | 无 | 供 `dsh-system-prompt` 使用的部署 persona 模板。 |
 | `toolOrder` | 字典序 | 供 `dsh-system-prompt` 使用的显式面向模型工具顺序。 |

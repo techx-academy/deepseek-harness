@@ -15,8 +15,11 @@ This package is a transport adapter, not a UI integration or a general capabilit
 | `provider` | — | Initial provider route for every created agent. |
 | `model` | — | Initial model for every created agent. |
 | `modelSelection` | `false` | Load the configured provider's model catalog at startup and expose it as a session-local standard ACP model selector. |
+| `modelReasoningDefaults` | `{}` | Model id to adapter-native reasoning effort, applied with that session's model selection. Requires `modelSelection` when non-empty. |
 
 `provider` and `model` remain optional when model selection is disabled so another agent/request listener may supply the target. Enabling `modelSelection` requires both fields, a non-empty adapter catalog, and the configured model in that catalog; startup fails loud otherwise.
+
+Each configured reasoning default must name a catalog model and an effort declared by that exact adapter route; startup rejects invalid entries before accepting sessions. Selection replaces provider, model, and any configured reasoning effort together. An omitted entry removes the previous session override and leaves the adapter's default behavior in force. Deployments with different model defaults must not also force one provider-wide effort. This adds no effort picker.
 
 ## Protocol contract
 
@@ -25,7 +28,7 @@ This package is a transport adapter, not a UI integration or a general capabilit
 | `initialize` | Negotiates the supported version. Image prompts are advertised only when a durable attachment store is mounted and every selectable model (or the fixed configured route) resolves with explicit image input; audio and embedded context stay false. No session, editor, terminal, filesystem, or MCP capability is advertised. |
 | `authenticate` | No-op because the server advertises no authentication methods. |
 | `session/new` | Creates a fresh agent with an absolute primary `cwd`; empty `additionalDirectories` and `mcpServers` are accepted, non-empty values reject. When enabled, returns one standard `model` config option whose values preserve adapter catalog order and metadata. |
-| `session/set_config_option` | When model selection is enabled, changes only the addressed idle session's model and returns the complete current option set. Unknown options, non-catalog values, boolean values, and changes during a prompt reject without mutation. |
+| `session/set_config_option` | When model selection is enabled, changes only the addressed idle session's model and configured reasoning default together and returns the complete current option set. Unknown options, non-catalog values, boolean values, and changes during a prompt reject without mutation. |
 | `session/prompt` | Preserves ordered text and supported inline image blocks, renders resource links as bracketed textual references, and rejects audio, embedded resources, malformed/empty input, or an image when capability was not advertised. It validates the whole image batch and rechecks the session's latest exact route before any save, commits every image before the user event, permits one in-flight request per session, and waits for admission plus, once queued, whole-Agent idle and ordered output delivery. Normal quiescence reports `end_turn`; explicit ACP cancellation, disposal, or a prompt whose admission was discarded (a turnless slot) reports `cancelled`. |
 | `session/cancel` | Marks and aborts any in-progress admission without cancelling or waiting for unrelated Agent work; once this prompt has entered the Agent inbox, it cancels the addressed Agent and waits for the owned interval to quiesce. No late user message is published and the prompt settles as `cancelled`. With no in-flight prompt it cancels autonomous work; unknown ids are no-ops. |
 | `session/update` | Emits one `agent_message_chunk` per non-empty text or image block in a committed `assistant/message`, preserving order. Images are re-read and integrity-verified before inline base64 delivery. Raw deltas and non-message events are omitted. |

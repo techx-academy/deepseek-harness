@@ -136,8 +136,11 @@ const SCENARIOS: Scenario[] = [
   { name: 'handshake', hasModelTurn: false, recorded: false },
   {
     name: 'model-selection',
-    hasModelTurn: false,
+    hasModelTurn: true,
     recorded: false,
+    pinsHeader: true,
+    headerClass: 'model-selection',
+    expectedHeaderChanges: 2,
     configPath: MODEL_SELECTION_CONFIG,
   },
   { name: 'reject-extra-dirs', hasModelTurn: false, recorded: false },

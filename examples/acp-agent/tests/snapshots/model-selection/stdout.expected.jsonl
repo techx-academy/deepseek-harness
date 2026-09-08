@@ -1,3 +1,10 @@
 {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentInfo":{"name":"deepseek-harness-acp","version":"0.0.1"},"agentCapabilities":{"promptCapabilities":{"image":false,"audio":false,"embeddedContext":false}},"authMethods":[]}}
 {"jsonrpc":"2.0","id":2,"result":{"sessionId":"{{sessionId}}","configOptions":[{"id":"model","name":"Model","description":"Model used by this session.","category":"model","type":"select","currentValue":"deepseek-v4-flash","options":[{"value":"deepseek-v4-flash","name":"DeepSeek V4 Flash"},{"value":"deepseek-v4-pro","name":"DeepSeek V4 Pro"}]}]}}
-{"jsonrpc":"2.0","id":3,"result":{"configOptions":[{"id":"model","name":"Model","description":"Model used by this session.","category":"model","type":"select","currentValue":"deepseek-v4-pro","options":[{"value":"deepseek-v4-flash","name":"DeepSeek V4 Flash"},{"value":"deepseek-v4-pro","name":"DeepSeek V4 Pro"}]}]}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{sessionId}}","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"PONG"}}}}
+{"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}
+{"jsonrpc":"2.0","id":4,"result":{"configOptions":[{"id":"model","name":"Model","description":"Model used by this session.","category":"model","type":"select","currentValue":"deepseek-v4-pro","options":[{"value":"deepseek-v4-flash","name":"DeepSeek V4 Flash"},{"value":"deepseek-v4-pro","name":"DeepSeek V4 Pro"}]}]}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{sessionId}}","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"PONG"}}}}
+{"jsonrpc":"2.0","id":5,"result":{"stopReason":"end_turn"}}
+{"jsonrpc":"2.0","id":6,"result":{"configOptions":[{"id":"model","name":"Model","description":"Model used by this session.","category":"model","type":"select","currentValue":"deepseek-v4-flash","options":[{"value":"deepseek-v4-flash","name":"DeepSeek V4 Flash"},{"value":"deepseek-v4-pro","name":"DeepSeek V4 Pro"}]}]}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{sessionId}}","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"PONG"}}}}
+{"jsonrpc":"2.0","id":7,"result":{"stopReason":"end_turn"}}
